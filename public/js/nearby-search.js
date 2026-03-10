@@ -11,6 +11,7 @@ class NearbySearch {
         this.map = null;
         this.userMarker = null;
         this.propertyMarkers = [];
+        this.radiusCircle = null; // Lưu vòng tròn bán kính hiện tại
         this.userLocation = null;
         this.currentRadius = 2; // km
         this.properties = [];
@@ -53,6 +54,7 @@ class NearbySearch {
         if (radiusSelect) {
             radiusSelect.addEventListener('change', (e) => {
                 this.currentRadius = parseFloat(e.target.value);
+                this.updateRadiusCircles();
                 this.filterPropertiesByRadius();
             });
         }
@@ -128,13 +130,26 @@ class NearbySearch {
 
         console.log('🌍 Đang yêu cầu quyền truy cập vị trí...');
 
+        // Thử với độ chính xác cao trước
         navigator.geolocation.getCurrentPosition(
             (position) => this.onLocationSuccess(position),
-            (error) => this.onLocationError(error),
+            (error) => {
+                console.warn('⚠️ Không thể lấy vị trí chính xác cao, thử với độ chính xác thấp hơn...');
+                // Nếu thất bại, thử lại với độ chính xác thấp hơn
+                navigator.geolocation.getCurrentPosition(
+                    (position) => this.onLocationSuccess(position),
+                    (error) => this.onLocationError(error),
+                    {
+                        enableHighAccuracy: false,
+                        timeout: 15000,
+                        maximumAge: 300000 // 5 phút
+                    }
+                );
+            },
             {
                 enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0
+                timeout: 30000, // 30 giây
+                maximumAge: 300000 // Chấp nhận vị trí cache trong 5 phút
             }
         );
     }
@@ -162,22 +177,27 @@ class NearbySearch {
 
     onLocationError(error) {
         console.error('❌ Lỗi lấy vị trí:', error);
+        this.hideLoading();
         
         let message = 'Không thể xác định vị trí của bạn.';
+        let suggestion = '';
         
         switch(error.code) {
             case error.PERMISSION_DENIED:
-                message = 'Bạn đã từ chối quyền truy cập vị trí. Vui lòng cho phép truy cập vị trí trong cài đặt trình duyệt.';
+                message = 'Bạn đã từ chối quyền truy cập vị trí.';
+                suggestion = 'Vui lòng cho phép truy cập vị trí trong cài đặt trình duyệt và tải lại trang.';
                 break;
             case error.POSITION_UNAVAILABLE:
-                message = 'Thông tin vị trí không khả dụng. Vui lòng kiểm tra kết nối GPS/mạng.';
+                message = 'Thông tin vị trí không khả dụng.';
+                suggestion = 'Vui lòng kiểm tra kết nối GPS/mạng hoặc thử ở nơi có tín hiệu tốt hơn.';
                 break;
             case error.TIMEOUT:
-                message = 'Yêu cầu xác định vị trí đã hết thời gian. Vui lòng thử lại.';
+                message = 'Không thể lấy vị trí trong thời gian quy định.';
+                suggestion = 'Vui lòng đảm bảo GPS được bật và thử lại. Hoặc nhập địa chỉ thủ công ở trên.';
                 break;
         }
         
-        this.showError(message);
+        this.showError(`${message} ${suggestion}`);
     }
 
     async getAddressFromCoords(lat, lng) {
@@ -203,15 +223,20 @@ class NearbySearch {
             container: 'nearbyMap',
             style: 'https://tiles.goong.io/assets/goong_map_web.json',
             center: [this.userLocation.lng, this.userLocation.lat],
-            zoom: 14
+            zoom: 13
+        });
+
+        // Wait for map to load before adding circles
+        this.map.on('load', () => {
+            this.drawRadiusCircles();
         });
 
         // Add user location marker
         const el = document.createElement('div');
-        el.style.cssText = 'background: #3B82F6; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3); cursor: pointer;';
+        el.style.cssText = 'background: #3B82F6; width: 24px; height: 24px; border-radius: 50%; border: 4px solid white; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.5); cursor: pointer; z-index: 1000;';
         
         const popup = new goongjs.Popup({ offset: 25 })
-            .setHTML('<div class="text-center"><strong>Vị trí của bạn</strong><br/><small>📍 Đang ở đây</small></div>');
+            .setHTML('<div class="text-center p-2"><strong class="text-blue-600">📍 Vị trí của bạn</strong><br/><small class="text-gray-500">Đang ở đây</small></div>');
         
         this.userMarker = new goongjs.Marker(el)
             .setLngLat([this.userLocation.lng, this.userLocation.lat])
@@ -372,6 +397,184 @@ class NearbySearch {
      * Calculate distance between two coordinates using Haversine formula
      * Returns distance in kilometers
      */
+    /**
+     * Draw radius circle on map (only one circle with current radius)
+     */
+    drawRadiusCircles() {
+        const sourceId = 'radius-circle';
+        const layerId = 'radius-layer';
+        const fillLayerId = 'radius-fill-layer';
+        const labelLayerId = 'radius-label';
+
+        // Tạo circle data với bán kính hiện tại
+        const circle = this.createCircle(this.userLocation.lat, this.userLocation.lng, this.currentRadius);
+
+        // Add source
+        if (!this.map.getSource(sourceId)) {
+            this.map.addSource(sourceId, {
+                type: 'geojson',
+                data: circle
+            });
+        } else {
+            // Update existing source
+            this.map.getSource(sourceId).setData(circle);
+        }
+
+        // Add fill layer (màu xanh lá trong suốt)
+        if (!this.map.getLayer(fillLayerId)) {
+            this.map.addLayer({
+                id: fillLayerId,
+                type: 'fill',
+                source: sourceId,
+                paint: {
+                    'fill-color': '#10B981', // Màu xanh lá
+                    'fill-opacity': 0.1 // Trong suốt
+                }
+            });
+        }
+
+        // Add circle border layer (đường viền xanh lá)
+        if (!this.map.getLayer(layerId)) {
+            this.map.addLayer({
+                id: layerId,
+                type: 'line',
+                source: sourceId,
+                paint: {
+                    'line-color': '#10B981', // Màu xanh lá
+                    'line-width': 3,
+                    'line-opacity': 0.8
+                }
+            });
+        }
+
+        // Add label showing distance
+        const labelPoint = {
+            type: 'Feature',
+            geometry: {
+                type: 'Point',
+                coordinates: [this.userLocation.lng, this.userLocation.lat + (this.currentRadius / 111)] // Đặt label ở phía trên
+            },
+            properties: {
+                label: `${this.currentRadius}km`
+            }
+        };
+
+        const labelSourceId = 'radius-label-source';
+        if (!this.map.getSource(labelSourceId)) {
+            this.map.addSource(labelSourceId, {
+                type: 'geojson',
+                data: labelPoint
+            });
+        } else {
+            this.map.getSource(labelSourceId).setData(labelPoint);
+        }
+
+        if (!this.map.getLayer(labelLayerId)) {
+            this.map.addLayer({
+                id: labelLayerId,
+                type: 'symbol',
+                source: labelSourceId,
+                layout: {
+                    'text-field': ['get', 'label'],
+                    'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+                    'text-size': 14,
+                    'text-offset': [0, 0]
+                },
+                paint: {
+                    'text-color': '#10B981',
+                    'text-halo-color': '#ffffff',
+                    'text-halo-width': 2
+                }
+            });
+        }
+    }
+
+    /**
+     * Create circle coordinates
+     */
+    createCircle(lat, lng, radiusInKm, points = 64) {
+        const coords = {
+            latitude: lat,
+            longitude: lng
+        };
+
+        const km = radiusInKm;
+        const ret = [];
+        const distanceX = km / (111.320 * Math.cos(coords.latitude * Math.PI / 180));
+        const distanceY = km / 110.574;
+
+        for (let i = 0; i < points; i++) {
+            const theta = (i / points) * (2 * Math.PI);
+            const x = distanceX * Math.cos(theta);
+            const y = distanceY * Math.sin(theta);
+            ret.push([coords.longitude + x, coords.latitude + y]);
+        }
+        ret.push(ret[0]);
+
+        return {
+            type: 'Feature',
+            geometry: {
+                type: 'Polygon',
+                coordinates: [ret]
+            }
+        };
+    }
+
+    /**
+     * Update radius circle when radius changes
+     */
+    updateRadiusCircles() {
+        if (!this.map) return;
+
+        const sourceId = 'radius-circle';
+        const labelSourceId = 'radius-label-source';
+
+        // Tạo circle data mới với bán kính hiện tại
+        const circle = this.createCircle(this.userLocation.lat, this.userLocation.lng, this.currentRadius);
+        
+        // Cập nhật data của source
+        if (this.map.getSource(sourceId)) {
+            this.map.getSource(sourceId).setData(circle);
+        }
+
+        // Cập nhật label
+        const labelPoint = {
+            type: 'Feature',
+            geometry: {
+                type: 'Point',
+                coordinates: [this.userLocation.lng, this.userLocation.lat + (this.currentRadius / 111)]
+            },
+            properties: {
+                label: `${this.currentRadius}km`
+            }
+        };
+
+        if (this.map.getSource(labelSourceId)) {
+            this.map.getSource(labelSourceId).setData(labelPoint);
+        }
+
+        // Zoom map to fit the circle
+        const bounds = this.getCircleBounds(this.userLocation.lat, this.userLocation.lng, this.currentRadius);
+        this.map.fitBounds(bounds, {
+            padding: 50,
+            maxZoom: 14,
+            duration: 1000
+        });
+    }
+
+    /**
+     * Get bounds for circle to fit map view
+     */
+    getCircleBounds(lat, lng, radiusInKm) {
+        const latChange = radiusInKm / 110.574;
+        const lngChange = radiusInKm / (111.320 * Math.cos(lat * Math.PI / 180));
+
+        return [
+            [lng - lngChange, lat - latChange], // Southwest
+            [lng + lngChange, lat + latChange]  // Northeast
+        ];
+    }
+
     calculateDistance(lat1, lon1, lat2, lon2) {
         const R = 6371; // Earth's radius in km
         const dLat = this.deg2rad(lat2 - lat1);

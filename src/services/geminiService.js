@@ -16,9 +16,9 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY
 });
 
-// Lấy model Gemini 2.5 Flash
+// Lấy model Gemini 1.5 Flash
 const model = genAI.getGenerativeModel({ 
-  model: 'gemini-2.5-flash-latest',
+  model: 'gemini-2.5-flash',
   generationConfig: {
     temperature: 0.7,
     topP: 0.95,
@@ -48,11 +48,40 @@ Thông tin về dịch vụ:
 - Bảo mật thông tin, giao dịch an toàn
 
 Phong cách giao tiếp:
-- Thân thiện, nhiệt tình, chuyên nghiệp
-- Trả lời bằng tiếng Việt
-- Ngắn gọn, dễ hiểu, súc tích
-- Sử dụng emoji phù hợp (🏠, 💰, 📍, ✅, 🔍, ...)
-- Hỏi lại để hiểu rõ nhu cầu nếu câu hỏi chưa rõ ràng
+- Trả lời CỰC KỲ NGẮN GỌN
+- LUÔN XUỐNG DÒNG sau mỗi ý (thêm 2 dấu xuống dòng)
+- Mỗi ý CHỈ 5-8 từ
+- Dùng emoji đầu dòng
+- TUYỆT ĐỐI KHÔNG dùng ví dụ trong ngoặc ()
+
+FORMAT BẮT BUỘC:
+Dòng 1: Lời chào + emoji
+
+[XUỐNG DÒNG]
+
+Dòng 2: Câu hỏi 1 + emoji
+
+[XUỐNG DÒNG]
+
+Dòng 3: Câu hỏi 2 + emoji
+
+[XUỐNG DÒNG]
+
+Dòng 4: Lời kết
+
+VÍ DỤ ĐÚNG (Copy y chang format này):
+Chào bạn! 👋
+
+📍 Bạn muốn ở đâu?
+
+💰 Ngân sách bao nhiêu?
+
+🏠 Loại phòng gì?
+
+Mình tìm giúp ngay! 🔍
+
+VÍ DỤ SAI (TRÁNH - Không xuống dòng):
+Chào bạn! Rất vui được hỗ trợ bạn. 1. Bạn muốn thuê ở khu vực nào? (Ví dụ: Quận Bình Thạnh) 2. Ngân sách của bạn là bao nhiêu? (Ví dụ: 3-5 triệu)
 
 Lưu ý:
 - Không trả lời các câu hỏi không liên quan đến bất động sản, cho thuê phòng
@@ -150,7 +179,7 @@ const chatWithGroq = async (message, history = []) => {
 };
 
 /**
- * Chat với AI (Groq Primary, Gemini Fallback)
+ * Chat với AI (Gemini Primary, Groq Fallback)
  * @param {String} message - Tin nhắn từ user
  * @param {Array} history - Lịch sử chat (optional)
  * @returns {Object} - Response từ AI
@@ -162,55 +191,55 @@ exports.chat = async (message, history = []) => {
            item.parts.length > 0 && item.parts[0].text && item.parts[0].text.trim() !== '';
   });
 
-  // Try Groq first (Primary)
+  // Try Gemini first (Primary)
   try {
-    console.log('🚀 Using Groq AI (Primary)...');
-    const groqResult = await chatWithGroq(message, validHistory);
-    return {
-      ...groqResult,
-      usingGroq: true,
-      primary: true
-    };
-  } catch (groqError) {
-    console.error('Groq AI Error:', groqError);
-    console.log('🔄 Groq failed, switching to Gemini fallback...');
+    console.log('🚀 Using Gemini AI (Primary)...');
+    const chat = model.startChat({
+      history: [
+        {
+          role: 'user',
+          parts: [{ text: SYSTEM_PROMPT }],
+        },
+        {
+          role: 'model',
+          parts: [{ text: 'Chào bạn! 👋 Tôi là trợ lý AI của hệ thống cho thuê phòng trọ. Tôi có thể giúp gì cho bạn hôm nay? 🏠' }],
+        },
+        ...validHistory
+      ],
+    });
+
+    const result = await retryWithBackoff(async () => {
+      return await chat.sendMessage(message);
+    });
     
-    // Fallback to Gemini
+    const response = result.response;
+    const text = response.text();
+
+    return {
+      success: true,
+      message: text,
+      usingGroq: false,
+      primary: true,
+      timestamp: new Date()
+    };
+  } catch (geminiError) {
+    console.error('Gemini AI Error:', geminiError);
+    console.log('🔄 Gemini failed, switching to Groq fallback...');
+    
+    // Fallback to Groq
     try {
-      const chat = model.startChat({
-        history: [
-          {
-            role: 'user',
-            parts: [{ text: SYSTEM_PROMPT }],
-          },
-          {
-            role: 'model',
-            parts: [{ text: 'Chào bạn! 👋 Tôi là trợ lý AI của hệ thống cho thuê phòng trọ. Tôi có thể giúp gì cho bạn hôm nay? 🏠' }],
-          },
-          ...validHistory
-        ],
-      });
-
-      const result = await retryWithBackoff(async () => {
-        return await chat.sendMessage(message);
-      });
-      
-      const response = result.response;
-      const text = response.text();
-
+      const groqResult = await chatWithGroq(message, validHistory);
       return {
-        success: true,
-        message: text,
-        usingGemini: true,
-        fallbackUsed: true,
-        timestamp: new Date()
+        ...groqResult,
+        usingGroq: true,
+        fallbackUsed: true
       };
-    } catch (geminiError) {
-      console.error('Gemini AI Error:', geminiError);
+    } catch (groqError) {
+      console.error('Groq AI Error:', groqError);
       return {
         success: false,
         error: 'ALL_AI_FAILED',
-        message: 'Xin lỗi, cả Groq và Gemini đều đang gặp sự cố. Vui lòng thử lại sau. 😔',
+        message: 'Xin lỗi, cả Gemini và Groq đều đang gặp sự cố. Vui lòng thử lại sau. 😔',
         timestamp: new Date()
       };
     }
@@ -279,7 +308,7 @@ ${properties.slice(0, 25).map((p, i) =>
    Vị trí: ${p.address?.district || 'N/A'}, ${p.address?.city || 'N/A'}
    Diện tích: ${p.area}m²
    Loại: ${p.propertyType || 'N/A'}
-   Tiện ích: ${p.amenities?.join(', ') || 'N/A'}`
+   Tiện ích: ${typeof p.amenities === 'object' ? Object.keys(p.amenities).filter(k => p.amenities[k]).join(', ') : 'N/A'}`
 ).join('\n\n')}
 
 QUY TẮC GỢI Ý:
@@ -415,23 +444,11 @@ exports.searchWithAI = async (message, history = [], properties = []) => {
            item.parts.length > 0 && item.parts[0].text && item.parts[0].text.trim() !== '';
   });
 
-  // Try Groq first (Primary)
+  // Try Gemini first (Primary)
   try {
-    console.log('🚀 Using Groq AI for search (Primary)...');
-    const groqResult = await searchWithGroq(message, validHistory, properties);
-    return {
-      ...groqResult,
-      usingGroq: true,
-      primary: true
-    };
-  } catch (groqError) {
-    console.error('Groq Search Error:', groqError);
-    console.log('🔄 Groq failed, switching to Gemini fallback...');
+    console.log('🚀 Using Gemini AI for search (Primary)...');
     
-    // Fallback to Gemini
-    try {
-      // System prompt đặc biệt cho tìm kiếm - GEMINI FALLBACK
-      const searchSystemPrompt = `Bạn là AI Assistant chuyên tìm kiếm và tư vấn phòng trọ/nhà cho thuê tại Việt Nam.
+    const searchSystemPrompt = `Bạn là AI Assistant chuyên tìm kiếm và tư vấn phòng trọ/nhà cho thuê tại Việt Nam.
 
 NHIỆM VỤ:
 1. Hỏi đáp thân thiện để hiểu nhu cầu: vị trí, giá, loại phòng, tiện ích
@@ -471,8 +488,8 @@ FORMAT KẾT QUẢ (khi gợi ý phòng):
 Lưu ý:
 - LUÔN trả về [RESULTS:...] ở cuối khi đã gợi ý phòng cụ thể`;
 
-      // Tạo chat session
-      const chat = model.startChat({
+    // Tạo chat session
+    const chat = model.startChat({
         history: [
           {
             role: 'user',
@@ -484,41 +501,53 @@ Lưu ý:
           },
           ...validHistory
         ],
-      });
+    });
 
-      // Gửi message với retry logic
-      const result = await retryWithBackoff(async () => {
-        return await chat.sendMessage(message);
-      }, 2, 1000); // Retry up to 2 times for search
-      
-      const response = result.response;
-      const text = response.text();
+    // Gửi message với retry logic
+    const result = await retryWithBackoff(async () => {
+      return await chat.sendMessage(message);
+    }, 2, 1000); // Retry up to 2 times for search
+    
+    const response = result.response;
+    const text = response.text();
 
-      // Parse kết quả tìm kiếm
-      let propertyIds = [];
-      let cleanText = text;
-      
-      // Tìm [RESULTS:ID1,ID2,ID3]
-      const resultsMatch = text.match(/\[RESULTS:(.*?)\]/);
-      if (resultsMatch) {
-        const idsString = resultsMatch[1];
-        propertyIds = idsString.split(',').map(id => id.trim()).filter(id => id);
-        cleanText = text.replace(/\[RESULTS:.*?\]/, '').trim();
-      }
+    // Parse kết quả tìm kiếm
+    let propertyIds = [];
+    let cleanText = text;
+    
+    // Tìm [RESULTS:ID1,ID2,ID3]
+    const resultsMatch = text.match(/\[RESULTS:(.*?)\]/);
+    if (resultsMatch) {
+      const idsString = resultsMatch[1];
+      propertyIds = idsString.split(',').map(id => id.trim()).filter(id => id);
+      cleanText = text.replace(/\[RESULTS:.*?\]/, '').trim();
+    }
 
-      const isComplete = propertyIds.length > 0;
+    const isComplete = propertyIds.length > 0;
 
+    return {
+      success: true,
+      message: cleanText,
+      isComplete: isComplete,
+      propertyIds: propertyIds,
+      usingGroq: false,
+      primary: true,
+      timestamp: new Date()
+    };
+  } catch (geminiError) {
+    console.error('Gemini Search Error:', geminiError);
+    console.log('🔄 Gemini search failed, switching to Groq fallback...');
+    
+    // Fallback to Groq
+    try {
+      const groqResult = await searchWithGroq(message, validHistory, properties);
       return {
-        success: true,
-        message: cleanText,
-        isComplete: isComplete,
-        propertyIds: propertyIds,
-        usingGemini: true,
-        fallbackUsed: true,
-        timestamp: new Date()
+        ...groqResult,
+        usingGroq: true,
+        fallbackUsed: true
       };
-    } catch (geminiError) {
-      console.error('Gemini Search Error:', geminiError);
+    } catch (groqError) {
+      console.error('Groq Search Error:', groqError);
       return {
         success: false,
         error: 'ALL_AI_FAILED',

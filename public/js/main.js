@@ -159,6 +159,16 @@ function initSearchForm() {
     
     if (!searchForm) return;
     
+    // Ngăn form submit khi nhấn Enter trong NLP search input
+    const nlpInput = document.getElementById('heroNlpSearch');
+    if (nlpInput) {
+        nlpInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.stopPropagation(); // Ngăn event bubble lên form
+            }
+        });
+    }
+    
     searchForm.addEventListener('submit', function(e) {
         e.preventDefault();
         

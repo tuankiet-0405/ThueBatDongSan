@@ -358,7 +358,7 @@ exports.createProperty = async (req, res, next) => {
       console.log(`🤖 Auto-moderation hoàn thành:`);
       console.log(`   Status: ${moderationResult.status}`);
       console.log(`   Decision: ${moderationResult.moderationDecision}`);
-      console.log(`   Score: ${moderationResult.moderationScore?.toFixed(1)}%`);
+      console.log(`   Score: ${(moderationResult.moderationScore * 100)?.toFixed(1)}%`);
       
       // Tạo thông báo cho user dựa trên kết quả
       let notificationTitle = '';
@@ -381,7 +381,7 @@ exports.createProperty = async (req, res, next) => {
         notificationColor = 'red';
       } else {
         notificationTitle = 'Bài đăng chờ xem xét';
-        notificationMessage = `Bài đăng "${property.title}" đang chờ quản trị viên xem xét. Điểm: ${moderationResult.moderationScore?.toFixed(1)}/100`;
+        notificationMessage = `Bài đăng "${property.title}" đang chờ quản trị viên xem xét. Điểm: ${(moderationResult.moderationScore * 100)?.toFixed(1)}/100`;
         notificationType = 'system';
         notificationIcon = 'fa-clock';
         notificationColor = 'yellow';
@@ -414,17 +414,17 @@ exports.createProperty = async (req, res, next) => {
         
         if (moderationResult.status === 'available') {
           adminNotificationTitle = 'Bài đăng tự động duyệt';
-          adminNotificationMessage = `Bài đăng "${property.title}" đã được AI tự động duyệt (Điểm: ${moderationResult.moderationScore?.toFixed(1)}/100)`;
+          adminNotificationMessage = `Bài đăng "${property.title}" đã được AI tự động duyệt (Điểm: ${(moderationResult.moderationScore * 100)?.toFixed(1)}/100)`;
           adminNotificationIcon = 'fa-robot';
           adminNotificationColor = 'green';
         } else if (moderationResult.status === 'rejected') {
           adminNotificationTitle = 'Bài đăng tự động từ chối';
-          adminNotificationMessage = `Bài đăng "${property.title}" đã bị AI tự động từ chối (Điểm: ${moderationResult.moderationScore?.toFixed(1)}/100). Lý do: ${moderationResult.failedReason}`;
+          adminNotificationMessage = `Bài đăng "${property.title}" đã bị AI tự động từ chối (Điểm: ${(moderationResult.moderationScore * 100)?.toFixed(1)}/100). Lý do: ${moderationResult.failedReason}`;
           adminNotificationIcon = 'fa-robot';
           adminNotificationColor = 'red';
         } else if (moderationResult.status === 'pending') {
           adminNotificationTitle = 'Bài đăng cần xem xét';
-          adminNotificationMessage = `Bài đăng "${property.title}" cần admin xem xét thủ công (Điểm: ${moderationResult.moderationScore?.toFixed(1)}/100)`;
+          adminNotificationMessage = `Bài đăng "${property.title}" cần admin xem xét thủ công (Điểm: ${(moderationResult.moderationScore * 100)?.toFixed(1)}/100)`;
           adminNotificationIcon = 'fa-exclamation-triangle';
           adminNotificationColor = 'yellow';
         }

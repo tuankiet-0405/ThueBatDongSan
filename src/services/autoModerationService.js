@@ -84,6 +84,37 @@ function checkBasicRules(property) {
   const descIssues = checkBannedContent(description);
   const bannedContentIssues = [...titleIssues, ...descIssues];
   
+  // THÊM: Kiểm tra spam pattern trong tiêu đề và mô tả
+  const spamIssues = [];
+  
+  // Pattern 1: Chuỗi lặp lại liên tiếp (abcabc, 123123)
+  const repeatingPattern = /(.{3,})\1{1,}/;
+  if (repeatingPattern.test(title)) {
+    const matches = title.match(repeatingPattern);
+    spamIssues.push(`Tiêu đề spam (lặp lại: "${matches[1]}...")`);
+  }
+  
+  // Pattern 2: Ký tự đan xen lặp lại (dsadsa, asdasd)
+  const alternatingPattern = /^([a-z]{2,4})\1+$/i;
+  if (alternatingPattern.test(title.replace(/\s/g, ''))) {
+    spamIssues.push(`Tiêu đề spam (ký tự lặp đan xen)`);
+  }
+  
+  // Pattern 3: Chuỗi phụ âm dài không có nghĩa
+  const consonantCluster = /[bcdfghjklmnpqrstvwxyz]{6,}/gi;
+  if (consonantCluster.test(title)) {
+    spamIssues.push(`Tiêu đề chứa chuỗi phụ âm dài không có nghĩa`);
+  }
+  
+  if (title.length < 10) {
+    spamIssues.push('Tiêu đề quá ngắn (< 10 ký tự)');
+  }
+  if (description.length < 50) {
+    spamIssues.push('Mô tả quá ngắn (< 50 ký tự)');
+  }
+  
+  const hasSpamIssues = spamIssues.length > 0;
+  
   const rules = [
     { name: 'images', check: (property.images?.length || 0) >= 3, weight: 15, message: 'Thiếu ảnh (cần >= 3 ảnh)' },
     { name: 'description', check: (property.description?.length || 0) >= 100, weight: 15, message: 'Mô tả quá ngắn (cần >= 100 ký tự)' },
@@ -91,7 +122,9 @@ function checkBasicRules(property) {
     { name: 'area', check: property.area >= 10 && property.area <= 500, weight: 15, message: 'Diện tích không hợp lý (10-500m²)' },
     { name: 'coordinates', check: property.location?.coordinates?.length === 2, weight: 10, message: 'Thiếu tọa độ' },
     { name: 'contact', check: property.contact?.phone?.length >= 10, weight: 10, message: 'Thiếu thông tin liên hệ' },
-    { name: 'banned_content', check: bannedContentIssues.length === 0, weight: 20, message: bannedContentIssues.length > 0 ? bannedContentIssues.join('; ') : '' }
+    { name: 'banned_content', check: bannedContentIssues.length === 0, weight: 20, message: bannedContentIssues.length > 0 ? bannedContentIssues.join('; ') : '' },
+    // THÊM: Rule kiểm tra spam - trọng số cao
+    { name: 'spam_pattern', check: !hasSpamIssues, weight: 20, message: spamIssues.join('; ') }
   ];
 
   let score = 0;
@@ -104,13 +137,19 @@ function checkBasicRules(property) {
       if (rule.message) failedRules.push(rule.message);
     }
   });
+  
+  // Nếu có spam nghiêm trọng (banned content hoặc spam pattern) → tối đa 40%
+  if (bannedContentIssues.length > 0 || hasSpamIssues) {
+    score = Math.min(score, 40);
+  }
 
   return {
     pass: score >= 70,
     score: score,
     reason: failedRules.length > 0 ? `Không đạt: ${failedRules.join(', ')}` : 'Đạt tất cả quy tắc cơ bản',
     details: failedRules,
-    bannedContentDetected: bannedContentIssues.length > 0
+    bannedContentDetected: bannedContentIssues.length > 0,
+    hasSpam: hasSpamIssues
   };
 }
 
@@ -275,8 +314,12 @@ async function validatePriceWithAI(property) {
       const actualPrice = property.price;
       const deviation = ((actualPrice - predictedPrice) / predictedPrice) * 100;
 
+      // Tăng penalty cho giá chênh lệch quá lớn
       let score = 100;
-      if (Math.abs(deviation) > 50) score = 50;
+      if (Math.abs(deviation) > 500) score = 5;  // Spam rõ ràng
+      else if (Math.abs(deviation) > 200) score = 15; // Rất nghi ngờ
+      else if (Math.abs(deviation) > 100) score = 30; // Nghi ngờ cao
+      else if (Math.abs(deviation) > 50) score = 50;  // Nghi ngờ
       else if (Math.abs(deviation) > 35) score = 70;
       else if (Math.abs(deviation) > 25) score = 80;
       else if (Math.abs(deviation) > 15) score = 90;
@@ -374,7 +417,7 @@ async function runAutoModeration(property) {
   return {
     status,
     moderationDecision,
-    moderationScore: finalScore,
+    moderationScore: finalScore / 100, // Chuyển từ 0-100 sang 0-1 để match với model schema
     moderationDetails: {
       rule_score: ruleCheck.score,
       content_score: contentCheck.score,

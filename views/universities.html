@@ -1228,15 +1228,43 @@
                 container: 'nearbyRoomsMap',
                 style: 'https://tiles.goong.io/assets/goong_map_web.json',
                 center: [lng, lat],
-                zoom: 14
+                zoom: 13
             });
             
-            // Thêm marker cho trường
+            // Vẽ vòng tròn bán kính khi map load xong
+            nearbyRoomsMap.on('load', () => {
+                drawRadiusCircle(lat, lng);
+            });
+            
+            // Thêm marker cho trường với style nổi bật
             const el = document.createElement('div');
             el.className = 'university-marker';
             el.innerHTML = '<i class="fas fa-university"></i>';
+            el.style.cssText = `
+                font-size: 28px; 
+                color: #DC2626; 
+                background: white; 
+                width: 48px; 
+                height: 48px; 
+                display: flex; 
+                align-items: center; 
+                justify-content: center; 
+                border-radius: 50%; 
+                border: 4px solid #DC2626; 
+                box-shadow: 0 4px 12px rgba(220, 38, 38, 0.6), 0 0 0 4px rgba(220, 38, 38, 0.2);
+                cursor: pointer;
+                transition: transform 0.2s;
+            `;
             
-            const popup = new goongjs.Popup({ offset: 25 })
+            // Thêm hiệu ứng hover
+            el.addEventListener('mouseenter', () => {
+                el.style.transform = 'scale(1.1)';
+            });
+            el.addEventListener('mouseleave', () => {
+                el.style.transform = 'scale(1)';
+            });
+            
+            const popup = new goongjs.Popup({ offset: 30 })
                 .setHTML(`
                     <div class="text-center p-2">
                         <div class="text-lg font-bold text-red-600 mb-1">🏫 ${university.name}</div>
@@ -1248,6 +1276,184 @@
                 .setLngLat([lng, lat])
                 .setPopup(popup)
                 .addTo(nearbyRoomsMap);
+        }
+        
+        /**
+         * Vẽ vòng tròn bán kính xung quanh trường
+         */
+        function drawRadiusCircle(lat, lng) {
+            const radius = parseFloat(document.getElementById('nearbyRoomsRadius').value);
+            const sourceId = 'university-radius-circle';
+            const layerId = 'university-radius-layer';
+            const fillLayerId = 'university-radius-fill';
+            const labelLayerId = 'university-radius-label';
+
+            // Tạo circle data
+            const circle = createCircleData(lat, lng, radius);
+
+            // Add source
+            if (!nearbyRoomsMap.getSource(sourceId)) {
+                nearbyRoomsMap.addSource(sourceId, {
+                    type: 'geojson',
+                    data: circle
+                });
+            } else {
+                nearbyRoomsMap.getSource(sourceId).setData(circle);
+            }
+
+            // Add fill layer (màu xanh lá trong suốt)
+            if (!nearbyRoomsMap.getLayer(fillLayerId)) {
+                nearbyRoomsMap.addLayer({
+                    id: fillLayerId,
+                    type: 'fill',
+                    source: sourceId,
+                    paint: {
+                        'fill-color': '#10B981', // Màu xanh lá
+                        'fill-opacity': 0.1 // Trong suốt
+                    }
+                });
+            }
+
+            // Add circle border layer (đường viền xanh lá)
+            if (!nearbyRoomsMap.getLayer(layerId)) {
+                nearbyRoomsMap.addLayer({
+                    id: layerId,
+                    type: 'line',
+                    source: sourceId,
+                    paint: {
+                        'line-color': '#10B981', // Màu xanh lá
+                        'line-width': 3,
+                        'line-opacity': 0.8
+                    }
+                });
+            }
+
+            // Add label
+            const labelPoint = {
+                type: 'Feature',
+                geometry: {
+                    type: 'Point',
+                    coordinates: [lng, lat + (radius / 111)]
+                },
+                properties: {
+                    label: `${radius}km`
+                }
+            };
+
+            const labelSourceId = 'university-radius-label-source';
+            if (!nearbyRoomsMap.getSource(labelSourceId)) {
+                nearbyRoomsMap.addSource(labelSourceId, {
+                    type: 'geojson',
+                    data: labelPoint
+                });
+            } else {
+                nearbyRoomsMap.getSource(labelSourceId).setData(labelPoint);
+            }
+
+            if (!nearbyRoomsMap.getLayer(labelLayerId)) {
+                nearbyRoomsMap.addLayer({
+                    id: labelLayerId,
+                    type: 'symbol',
+                    source: labelSourceId,
+                    layout: {
+                        'text-field': ['get', 'label'],
+                        'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+                        'text-size': 14,
+                        'text-offset': [0, 0]
+                    },
+                    paint: {
+                        'text-color': '#10B981',
+                        'text-halo-color': '#ffffff',
+                        'text-halo-width': 2
+                    }
+                });
+            }
+        }
+        
+        /**
+         * Tạo dữ liệu vòng tròn
+         */
+        function createCircleData(lat, lng, radiusInKm, points = 64) {
+            const coords = { latitude: lat, longitude: lng };
+            const km = radiusInKm;
+            const ret = [];
+            const distanceX = km / (111.320 * Math.cos(coords.latitude * Math.PI / 180));
+            const distanceY = km / 110.574;
+
+            for (let i = 0; i < points; i++) {
+                const theta = (i / points) * (2 * Math.PI);
+                const x = distanceX * Math.cos(theta);
+                const y = distanceY * Math.sin(theta);
+                ret.push([coords.longitude + x, coords.latitude + y]);
+            }
+            ret.push(ret[0]);
+
+            return {
+                type: 'Feature',
+                geometry: {
+                    type: 'Polygon',
+                    coordinates: [ret]
+                }
+            };
+        }
+        
+        /**
+         * Cập nhật vòng tròn khi thay đổi bán kính
+         */
+        function updateRadiusCircle() {
+            if (!nearbyRoomsMap) return;
+            
+            const university = allUniversities.find(u => u._id === currentUniversityId);
+            if (!university) return;
+            
+            const [lng, lat] = university.location.coordinates;
+            const radius = parseFloat(document.getElementById('nearbyRoomsRadius').value);
+            
+            const sourceId = 'university-radius-circle';
+            const labelSourceId = 'university-radius-label-source';
+
+            // Cập nhật circle
+            const circle = createCircleData(lat, lng, radius);
+            if (nearbyRoomsMap.getSource(sourceId)) {
+                nearbyRoomsMap.getSource(sourceId).setData(circle);
+            }
+
+            // Cập nhật label
+            const labelPoint = {
+                type: 'Feature',
+                geometry: {
+                    type: 'Point',
+                    coordinates: [lng, lat + (radius / 111)]
+                },
+                properties: {
+                    label: `${radius}km`
+                }
+            };
+
+            if (nearbyRoomsMap.getSource(labelSourceId)) {
+                nearbyRoomsMap.getSource(labelSourceId).setData(labelPoint);
+            }
+
+            // Zoom map để fit vòng tròn
+            const bounds = getCircleBounds(lat, lng, radius);
+            nearbyRoomsMap.fitBounds(bounds, {
+                padding: 50,
+                maxZoom: 14,
+                duration: 1000
+            });
+        }
+        
+        /**
+         * Tính bounds cho vòng tròn
+         */
+        function getCircleBounds(lat, lng, radiusInKm) {
+            const latChange = radiusInKm / 110.574;
+            const lngChange = radiusInKm / (111.320 * Math.cos(lat * Math.PI / 180));
+
+            return [
+                [lng - lngChange, lat - latChange], // Southwest
+                [lng + lngChange, lat + latChange]  // Northeast
+            ];
         }
         
         function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -1264,6 +1470,9 @@
         function filterAndDisplayNearbyRooms() {
             const university = allUniversities.find(u => u._id === currentUniversityId);
             if (!university) return;
+            
+            // Cập nhật vòng tròn khi thay đổi bán kính
+            updateRadiusCircle();
             
             const radius = parseFloat(document.getElementById('nearbyRoomsRadius').value);
             const [uniLng, uniLat] = university.location.coordinates;

@@ -63,9 +63,18 @@ class FavoritesPageLoader {
       item.className = 'favorite-item group bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300';
       item.dataset.id = property._id;
 
-      const imageUrl = property.images && property.images.length > 0 
-        ? property.images[0] 
-        : '/images/property-default.jpg';
+      // Xử lý đường dẫn hình ảnh
+      let imageUrl = '/images/property-default.jpg'; // Default image
+      if (property.images && property.images.length > 0) {
+        const firstImage = property.images[0];
+        // Kiểm tra nếu đã có đường dẫn đầy đủ (http/https) hoặc bắt đầu với /
+        if (firstImage.startsWith('http://') || firstImage.startsWith('https://') || firstImage.startsWith('/')) {
+          imageUrl = firstImage;
+        } else {
+          // Nếu chỉ là tên file, thêm /uploads/ vào trước
+          imageUrl = `/uploads/${firstImage}`;
+        }
+      }
 
       const price = new Intl.NumberFormat('vi-VN').format(property.price);
       

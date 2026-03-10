@@ -195,17 +195,29 @@ function populatePropertyData(property) {
 
     // Amenities
     const amenitiesContainer = document.getElementById('property-amenities');
-    const amenities = property.amenities || [];
-    if (amenities.length > 0) {
-        amenitiesContainer.innerHTML = amenities.map(amenity => `
-            <div class="flex items-center text-gray-700">
-                <i class="fas fa-check-circle text-green-500 mr-2"></i>
-                ${amenity}
+    const amenities = property.amenities || {};
+    
+    const amenitiesData = [
+        { key: 'wifi', label: 'WiFi', icon: 'wifi' },
+        { key: 'ac', label: 'Điều hòa', icon: 'fan' },
+        { key: 'parking', label: 'Chỗ đậu xe', icon: 'parking' },
+        { key: 'kitchen', label: 'Nhà bếp', icon: 'utensils' },
+        { key: 'water', label: 'Nước nóng', icon: 'tint' },
+        { key: 'laundry', label: 'Máy giặt', icon: 'soap' },
+        { key: 'balcony', label: 'Ban công', icon: 'building' },
+        { key: 'security', label: 'An ninh', icon: 'shield-alt' }
+    ];
+    
+    amenitiesContainer.innerHTML = amenitiesData.map(item => {
+        const hasAmenity = amenities[item.key];
+        return `
+            <div class="flex items-center gap-2 p-3 rounded-lg ${hasAmenity ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-400'}">
+                <i class="fas fa-${item.icon} text-lg"></i>
+                <span class="flex-1">${item.label}</span>
+                ${hasAmenity ? '<i class="fas fa-check"></i>' : '<i class="fas fa-times"></i>'}
             </div>
-        `).join('');
-    } else {
-        amenitiesContainer.innerHTML = '<p class="text-gray-500 italic">Không có thông tin tiện nghi</p>';
-    }
+        `;
+    }).join('');
 
     // Landlord info
     if (property.landlord) {

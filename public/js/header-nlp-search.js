@@ -231,9 +231,21 @@ class HeaderNLPSearch {
    * Open results modal
    */
   openResults() {
+    console.log('🚪 openResults called');
+    console.log('📦 resultsModal exists?', !!this.resultsModal);
+    
+    if (!this.resultsModal) {
+      console.error('❌ resultsModal not found! Creating modal...');
+      this.createResultsModal();
+    }
+    
     if (this.resultsModal) {
+      console.log('✅ Adding active class to modal');
       this.resultsModal.classList.add('active');
       document.body.style.overflow = 'hidden';
+      console.log('✅ Modal should be visible now');
+    } else {
+      console.error('❌ Failed to create/find modal!');
     }
   }
 
@@ -266,7 +278,14 @@ class HeaderNLPSearch {
    * Display results
    */
   displayResults(result) {
-    if (!this.resultsContainer) return;
+    console.log('📊 displayResults called with:', result);
+    console.log('📦 resultsContainer exists?', !!this.resultsContainer);
+    console.log('📦 resultsModal exists?', !!this.resultsModal);
+    
+    if (!this.resultsContainer) {
+      console.error('❌ resultsContainer not found! Recreating modal...');
+      this.createResultsModal();
+    }
 
     const { query, parsed, count, data, message, translatedQuery } = result;
 
@@ -286,6 +305,7 @@ class HeaderNLPSearch {
     `;
 
     this.resultsContainer.innerHTML = html;
+    console.log('✅ Results HTML updated');
   }
 
   /**

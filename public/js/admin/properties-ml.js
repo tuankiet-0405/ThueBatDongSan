@@ -1046,6 +1046,8 @@ function renderAmenityBadge(name, hasAmenity) {
  */
 function closeMLModal() {
     document.getElementById('mlModal').classList.remove('active');
+    // Reload properties để cập nhật danh sách nếu có thay đổi
+    loadProperties();
 }
 
 /**
@@ -1096,8 +1098,9 @@ function formatFullAddress(address) {
 /**
  * Approve property
  */
-async function approveProperty(id) {
-    if (!confirm('Bạn có chắc muốn duyệt property này?')) return;
+async function approveProperty(id, skipConfirm = false) {
+    // Chỉ hiển thị confirm nếu KHÔNG phải từ auto-moderation
+    if (!skipConfirm && !confirm('Bạn có chắc muốn duyệt property này?')) return;
 
     try {
         const response = await fetch(`/api/admin/properties/${id}/approve`, {
@@ -1134,8 +1137,9 @@ async function approveProperty(id) {
 /**
  * Reject property
  */
-async function rejectProperty(id) {
-    if (!confirm('Bạn có chắc muốn từ chối property này?')) return;
+async function rejectProperty(id, skipConfirm = false) {
+    // Chỉ hiển thị confirm nếu KHÔNG phải từ auto-moderation
+    if (!skipConfirm && !confirm('Bạn có chắc muốn từ chối property này?')) return;
 
     try {
         const response = await fetch(`/api/admin/properties/${id}/reject`, {
@@ -1535,6 +1539,35 @@ async function autoModerateProperty(propertyId) {
             }
         });
 
+        // === TỰ ĐỘNG APPROVE NGAY NẾU ĐIỂM > 85% ===
+        if (finalScore > 85 && property.status === 'pending') {
+            console.log(`🎉 Điểm ${finalScore.toFixed(1)}% > 85% - Tự động duyệt ngay!`);
+            
+            // Đợi 1.5 giây để user đọc kết quả
+            setTimeout(async () => {
+                try {
+                    await approveProperty(propertyId, true); // skipConfirm = true
+                    showNotification(`✅ Đã tự động duyệt bài đăng (Điểm: ${finalScore.toFixed(1)}/100)`, 'success');
+                } catch (error) {
+                    console.error('❌ Lỗi khi tự động duyệt:', error);
+                    showNotification('Lỗi khi tự động duyệt. Vui lòng duyệt thủ công.', 'error');
+                }
+            }, 1500);
+        } else if (finalScore < 50) {
+            // === TỰ ĐỘNG TỪ CHỐI NẾU ĐIỂM < 50% ===
+            console.log(`❌ Điểm ${finalScore.toFixed(1)}% < 50% - Tự động từ chối!`);
+            
+            setTimeout(async () => {
+                try {
+                    await rejectProperty(propertyId, true); // skipConfirm = true
+                    showNotification(`❌ Đã tự động từ chối bài đăng (Điểm: ${finalScore.toFixed(1)}/100)`, 'error');
+                } catch (error) {
+                    console.error('❌ Lỗi khi tự động từ chối:', error);
+                    showNotification('Lỗi khi tự động từ chối. Vui lòng xem xét thủ công.', 'error');
+                }
+            }, 1500);
+        }
+
     } catch (error) {
         console.error('❌ Auto moderation error:', error);
         showNotification('Lỗi khi xét duyệt tự động: ' + error.message, 'error');
@@ -1698,6 +1731,15 @@ function showAutoModerationResult(property, result) {
     const statusColor = result.approved ? 'green' : 'red';
     const statusIcon = result.approved ? 'check-circle' : 'times-circle';
     const statusText = result.approved ? 'ĐỀ XUẤT DUYỆT' : 'ĐỀ XUẤT TỪ CHỐI';
+    
+    // Kiểm tra status thực tế của property
+    const isAlreadyApproved = property.status === 'available';
+    const isAlreadyRejected = property.status === 'rejected';
+    const actualStatusBadge = isAlreadyApproved 
+        ? '<div style="background: rgba(255,255,255,0.95); color: #059669; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 700; font-size: 0.875rem; display: inline-flex; align-items: center; gap: 0.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.15);"><i class="fas fa-check-double"></i> ĐÃ TỰ ĐỘNG DUYỆT</div>'
+        : isAlreadyRejected
+        ? '<div style="background: rgba(255,255,255,0.95); color: #dc2626; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 700; font-size: 0.875rem; display: inline-flex; align-items: center; gap: 0.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.15);"><i class="fas fa-ban"></i> ĐÃ TỰ ĐỘNG TỪ CHỐI</div>'
+        : '';
 
     modalContent.innerHTML = `
         <!-- Header với gradient -->
@@ -1711,6 +1753,7 @@ function showAutoModerationResult(property, result) {
                     <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
                         <i class="fas fa-robot" style="font-size: 1.75rem;"></i>
                         <h2 style="font-size: 1.5rem; font-weight: 700; margin: 0;">Kết quả xét duyệt tự động</h2>
+                        ${actualStatusBadge ? '<div style="margin-left: 1rem;">' + actualStatusBadge + '</div>' : ''}
                     </div>
                     <div style="display: flex; align-items: center; gap: 1rem; background: rgba(255,255,255,0.15); 
                                 padding: 1rem; border-radius: 8px; backdrop-filter: blur(10px);">
@@ -2045,7 +2088,7 @@ function showAutoModerationResult(property, result) {
                     display: flex; 
                     gap: 0.75rem; 
                     justify-content: flex-end;">
-            ${result.approved && result.autoApprove ? `
+            ${result.approved && result.autoApprove && property.status === 'pending' ? `
                 <button onclick="autoApproveProperty('${property._id}')" 
                         style="background: linear-gradient(135deg, #10b981, #059669); 
                                color: white;
@@ -2065,6 +2108,21 @@ function showAutoModerationResult(property, result) {
                     <i class="fas fa-check-circle"></i>
                     Tự động duyệt bài
                 </button>
+            ` : result.approved && result.autoApprove && property.status === 'available' ? `
+                <div style="background: linear-gradient(135deg, #d1fae5, #a7f3d0); 
+                            color: #065f46;
+                            padding: 0.875rem 1.5rem;
+                            border-radius: 8px;
+                            font-weight: 600;
+                            font-size: 0.875rem;
+                            display: inline-flex;
+                            align-items: center;
+                            gap: 0.75rem;
+                            border: 2px solid #10b981;
+                            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);">
+                    <i class="fas fa-check-double" style="font-size: 1.125rem;"></i>
+                    <span>Bài đăng đã được tự động duyệt và đang hiển thị công khai</span>
+                </div>
             ` : ''}
             ${!result.approved ? `
                 <button onclick="rejectProperty('${property._id}')" 
