@@ -1199,8 +1199,8 @@
                 loading.classList.add('hidden');
                 mapContainer.classList.remove('hidden');
                 
-                // Khởi tạo bản đồ
-                initNearbyRoomsMap(university);
+                // Khởi tạo bản đồ (await vì async)
+                await initNearbyRoomsMap(university);
                 
                 // Lọc và hiển thị phòng
                 filterAndDisplayNearbyRooms();
@@ -1213,7 +1213,7 @@
             }
         }
         
-        function initNearbyRoomsMap(university) {
+        async function initNearbyRoomsMap(university) {
             const mapElement = document.getElementById('nearbyRoomsMap');
             
             // Xóa map cũ nếu có
@@ -1221,9 +1221,11 @@
                 nearbyRoomsMap.remove();
             }
             
-            // Tạo map mới với Goong Map JS
+            // Tạo map mới với Goong Map JS - lấy key từ server
             const [lng, lat] = university.location.coordinates;
-            goongjs.accessToken = '3wUhxxPZujfl6OwVJ9N7YdDlGP6pJU62zw5PT4pg';
+            const mapKeyRes = await fetch('/api/search/maptiles-key');
+            const mapKeyData = await mapKeyRes.json();
+            goongjs.accessToken = mapKeyData.maptilesKey;
             nearbyRoomsMap = new goongjs.Map({
                 container: 'nearbyRoomsMap',
                 style: 'https://tiles.goong.io/assets/goong_map_web.json',

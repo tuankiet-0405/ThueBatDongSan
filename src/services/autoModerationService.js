@@ -7,7 +7,7 @@
 
 const axios = require('axios');
 
-const FLASK_PREDICT_URL = 'https://mattie-nonencyclopaedic-qualifiedly.ngrok-free.dev/predict';
+const FLASK_PREDICT_URL = process.env.FLASK_PREDICT_URL || 'http://localhost:5000/predict';
 
 /**
  * Danh sách từ cấm - Tục tĩu, lăng mạ, spam
@@ -309,8 +309,8 @@ async function validatePriceWithAI(property) {
 
     console.log('✅ Flask API Response:', response.data);
 
-    if (response.data && response.data.predicted_price) {
-      const predictedPrice = response.data.predicted_price;
+    if (response.data && (response.data.predicted_price_vnd || response.data.predicted_price)) {
+      const predictedPrice = response.data.predicted_price_vnd || response.data.predicted_price;
       const actualPrice = property.price;
       const deviation = ((actualPrice - predictedPrice) / predictedPrice) * 100;
 

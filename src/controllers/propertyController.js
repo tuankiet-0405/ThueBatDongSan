@@ -164,6 +164,14 @@ exports.createProperty = async (req, res, next) => {
         error: 'Vui lòng nhập đầy đủ thông tin'
       });
     }
+
+    // Validate positive numeric fields
+    if (Number(price) <= 0 || Number(area) <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Giá thuê và diện tích phải lớn hơn 0'
+      });
+    }
     
     // Kiểm tra địa chỉ: Phải có address đầy đủ HOẶC (street + province + district + ward)
     // Trim để tránh empty string ""

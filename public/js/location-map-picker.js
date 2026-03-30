@@ -6,8 +6,7 @@
 (function() {
     'use strict';
 
-    // Goong Maps API Key - sẽ được load từ server
-    let GOONG_API_KEY = '';
+    // Goong Maptiles Key - loaded from server proxy
     let GOONG_MAPTILES_KEY = '';
     
     let map = null;
@@ -29,17 +28,16 @@
     const addressSearchInput = document.getElementById('addressSearch');
 
     /**
-     * Load API keys từ server
+     * Load Maptiles key từ server (chỉ lấy key render bản đồ, không lộ API key)
      */
-    async function loadApiKeys() {
+    async function loadMaptilesKey() {
         try {
-            const response = await fetch('/api/config');
-            const config = await response.json();
-            GOONG_API_KEY = config.goongApiKey;
-            GOONG_MAPTILES_KEY = config.goongMaptilesKey;
+            const response = await fetch('/api/search/maptiles-key');
+            const data = await response.json();
+            GOONG_MAPTILES_KEY = data.maptilesKey;
         } catch (error) {
-            console.error('Error loading API keys:', error);
-            showNotification('Không thể tải cấu hình API', 'error');
+            console.error('Error loading maptiles key:', error);
+            showNotification('Không thể tải cấu hình bản đồ', 'error');
         }
     }
 
@@ -49,8 +47,8 @@
     async function initMapPicker() {
         if (!currentLocationBtn || !mapPickerBtn) return;
 
-        // Load API keys trước
-        await loadApiKeys();
+        // Load maptiles key trước
+        await loadMaptilesKey();
 
         // Event Listeners
         currentLocationBtn.addEventListener('click', handleCurrentLocation);
@@ -81,9 +79,9 @@
             return;
         }
 
-        // Kiểm tra API key đã load chưa
-        if (!GOONG_API_KEY) {
-            await loadApiKeys();
+        // Kiểm tra maptiles key đã load chưa
+        if (!GOONG_MAPTILES_KEY) {
+            await loadMaptilesKey();
         }
 
         // Disable button và show loading
@@ -149,13 +147,15 @@
     }
 
     /**
-     * Reverse Geocoding - Lấy địa chỉ từ tọa độ
+     * Reverse Geocoding - Lấy địa chỉ từ tọa độ (qua server proxy)
      */
     async function reverseGeocode(lat, lng) {
-        const url = `https://rsapi.goong.io/Geocode?latlng=${lat},${lng}&api_key=${GOONG_API_KEY}`;
-        
         try {
-            const response = await fetch(url);
+            const response = await fetch('/api/search/geocode', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ latlng: `${lat},${lng}` })
+            });
             const data = await response.json();
             
             if (data.results && data.results.length > 0) {
@@ -179,9 +179,9 @@
      * Mở modal chọn vị trí trên bản đồ
      */
     async function openMapPicker() {
-        // Kiểm tra API key đã load chưa
-        if (!GOONG_API_KEY) {
-            await loadApiKeys();
+        // Kiểm tra maptiles key đã load chưa
+        if (!GOONG_MAPTILES_KEY) {
+            await loadMaptilesKey();
         }
 
         mapPickerModal.classList.add('active');
@@ -297,25 +297,27 @@
             return;
         }
 
-        // Kiểm tra API key đã load chưa
-        if (!GOONG_API_KEY) {
-            await loadApiKeys();
-        }
-
         searchMapBtn.disabled = true;
         searchMapBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
         try {
-            const url = `https://rsapi.goong.io/Place/AutoComplete?api_key=${GOONG_API_KEY}&input=${encodeURIComponent(query)}`;
-            const response = await fetch(url);
+            // Gọi qua server proxy thay vì trực tiếp Goong API
+            const response = await fetch('/api/search/autocomplete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ input: query })
+            });
             const data = await response.json();
 
             if (data.predictions && data.predictions.length > 0) {
                 const placeId = data.predictions[0].place_id;
                 
-                // Get place details
-                const detailUrl = `https://rsapi.goong.io/Place/Detail?place_id=${placeId}&api_key=${GOONG_API_KEY}`;
-                const detailResponse = await fetch(detailUrl);
+                // Get place details qua server proxy
+                const detailResponse = await fetch('/api/search/place-detail', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ place_id: placeId })
+                });
                 const detailData = await detailResponse.json();
 
                 if (detailData.result) {

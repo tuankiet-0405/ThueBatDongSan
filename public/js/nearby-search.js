@@ -216,9 +216,11 @@ class NearbySearch {
         }
     }
 
-    initMap() {
-        // Create map centered on user location with Goong Map JS
-        goongjs.accessToken = '3wUhxxPZujfl6OwVJ9N7YdDlGP6pJU62zw5PT4pg';
+    async initMap() {
+        // Create map centered on user location with Goong Map JS - lấy key từ server
+        const mapKeyRes = await fetch('/api/search/maptiles-key');
+        const mapKeyData = await mapKeyRes.json();
+        goongjs.accessToken = mapKeyData.maptilesKey;
         this.map = new goongjs.Map({
             container: 'nearbyMap',
             style: 'https://tiles.goong.io/assets/goong_map_web.json',

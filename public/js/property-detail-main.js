@@ -276,7 +276,7 @@ function changeMainImage(src) {
 /**
  * Initialize Leaflet map
  */
-function initializeMap(property) {
+async function initializeMap(property) {
     if (!property.location || !property.location.coordinates || property.location.coordinates.length < 2) {
         document.getElementById('map').innerHTML = '<p class="text-center text-gray-500 py-20">Chưa có thông tin vị trí</p>';
         return;
@@ -284,8 +284,10 @@ function initializeMap(property) {
 
     const [lng, lat] = property.location.coordinates;
 
-    // Create map with Goong Map JS
-    goongjs.accessToken = '3wUhxxPZujfl6OwVJ9N7YdDlGP6pJU62zw5PT4pg';
+    // Create map with Goong Map JS - lấy key từ server
+    const mapKeyRes = await fetch('/api/search/maptiles-key');
+    const mapKeyData = await mapKeyRes.json();
+    goongjs.accessToken = mapKeyData.maptilesKey;
     const map = new goongjs.Map({
         container: 'map',
         style: 'https://tiles.goong.io/assets/goong_map_web.json',

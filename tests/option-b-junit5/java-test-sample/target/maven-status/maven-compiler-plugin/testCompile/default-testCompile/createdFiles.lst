@@ -1,0 +1,3 @@
+com\qlchothuetro\testing\blackbox\PropertyValidationServiceBlackBoxTest.class
+com\qlchothuetro\testing\whitebox\PropertyFilterServiceWhiteBoxTest.class
+com\qlchothuetro\testing\graybox\PropertyMapPresenterGrayBoxTest.class

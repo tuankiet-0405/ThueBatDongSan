@@ -226,14 +226,16 @@ function createPropertyCard(property) {
         if (property.amenities.waterHeater) amenities.push('<span class="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded"><i class="fas fa-bolt mr-1"></i>Nóng lạnh</span>');
     }
     
-    // Loại phòng
+    // Loại phòng - hỗ trợ cả slug và display name từ DB
     const typeMap = {
-        'phong-tro': 'Phòng trọ',
-        'nha-nguyen-can': 'Nhà nguyên căn',
-        'can-ho': 'Căn hộ',
-        'chung-cu-mini': 'Chung cư mini'
+        'phong-tro': 'Phòng trọ', 'Phòng trọ': 'Phòng trọ',
+        'nha-nguyen-can': 'Nhà nguyên căn', 'Nhà nguyên căn': 'Nhà nguyên căn',
+        'can-ho': 'Căn hộ', 'Căn hộ': 'Căn hộ',
+        'chung-cu-mini': 'Chung cư mini', 'Chung cư mini': 'Chung cư mini',
+        'studio': 'Studio', 'Studio': 'Studio',
+        'homestay': 'Homestay', 'Homestay': 'Homestay'
     };
-    const typeLabel = typeMap[property.type] || 'Phòng trọ';
+    const typeLabel = typeMap[property.propertyType] || typeMap[property.type] || 'Phòng trọ';
     
     // Badge trạng thái
     const statusBadge = property.status === 'available' 
@@ -387,12 +389,14 @@ function filterProperties() {
         if (selectedType) {
             const propertyType = property.propertyType || '';
             
-            // Normalize để so sánh (hỗ trợ cả format cũ và mới)
+            // Normalize để so sánh (hỗ trợ cả slug và display name)
             const typeMapping = {
-                'phong-tro': 'Phòng trọ',
-                'nha-nguyen-can': 'Nhà nguyên căn',
-                'can-ho': 'Căn hộ',
-                'chung-cu-mini': 'Chung cư mini'
+                'phong-tro': 'Phòng trọ', 'Phòng trọ': 'Phòng trọ',
+                'nha-nguyen-can': 'Nhà nguyên căn', 'Nhà nguyên căn': 'Nhà nguyên căn',
+                'can-ho': 'Căn hộ', 'Căn hộ': 'Căn hộ',
+                'chung-cu-mini': 'Chung cư mini', 'Chung cư mini': 'Chung cư mini',
+                'studio': 'Studio', 'Studio': 'Studio',
+                'homestay': 'Homestay', 'Homestay': 'Homestay'
             };
             
             const normalizedPropertyType = typeMapping[propertyType] || propertyType;

@@ -1,0 +1,6 @@
+Chuc nang yeu cau,Nhom kiem thu,Test class,Test methods da chay,So test,Ket qua
+getProperties,White Box,PropertyFilterServiceWhiteBoxTest,"shouldFilterApprovedAndSortByPrice; shouldPaginateCorrectly; shouldReturnEmptyForInvalidPaginationInput",3,Pass
+createProperty,Black Box,PropertyValidationServiceBlackBoxTest,"validInputShouldPass; missingTitleShouldFail; nonPositivePriceShouldFail; nonPositiveAreaShouldFail",4,Pass
+searchProperties,Gray Box,PropertySearchQueryBuilderGrayBoxTest,"shouldBuildAreaOnlyQuery; shouldBuildPriceOnlyQuery; shouldBuildDistrictOnlyQuery; shouldBuildCombinedQuery; shouldReturnEmptyQueryForEmptyFilters",5,Pass
+initializeMap,Gray Box,PropertyMapPresenterGrayBoxTest,"shouldUseRealCoordinatesWhenValid; shouldFallbackWhenCoordinatesNull; shouldRejectInvalidRange",3,Pass
+TOTAL,,,,15,Pass

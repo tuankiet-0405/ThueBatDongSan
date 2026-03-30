@@ -490,12 +490,14 @@
     
     <script>
         // Initialize Contact Map with Goong Map JS
-        function initContactMap() {
+        async function initContactMap() {
             // Vị trí văn phòng: 123 Phạm Ngũ Lão, Quận 1, TP.HCM
             const officeLocation = [106.6918, 10.7676]; // [lng, lat]
             
-            // Khởi tạo Goong Map
-            goongjs.accessToken = '3wUhxxPZujfl6OwVJ9N7YdDlGP6pJU62zw5PT4pg';
+            // Lấy key từ server proxy
+            const mapKeyRes = await fetch('/api/search/maptiles-key');
+            const mapKeyData = await mapKeyRes.json();
+            goongjs.accessToken = mapKeyData.maptilesKey;
             const map = new goongjs.Map({
                 container: 'contactMap',
                 style: 'https://tiles.goong.io/assets/goong_map_web.json',

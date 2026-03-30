@@ -976,14 +976,16 @@ function createPropertyCard(property) {
     }
     // Nếu status là 'pending' hoặc 'inactive' thì không hiển thị badge (vì API đã lọc)
     
-    // Loại phòng
+    // Loại phòng - hỗ trợ cả slug và display name từ DB
     const typeMap = {
-        'phong-tro': 'Phòng trọ',
-        'nha-nguyen-can': 'Nhà nguyên căn',
-        'can-ho': 'Căn hộ',
-        'chung-cu-mini': 'Chung cư mini'
+        'phong-tro': 'Phòng trọ', 'Phòng trọ': 'Phòng trọ',
+        'nha-nguyen-can': 'Nhà nguyên căn', 'Nhà nguyên căn': 'Nhà nguyên căn',
+        'can-ho': 'Căn hộ', 'Căn hộ': 'Căn hộ',
+        'chung-cu-mini': 'Chung cư mini', 'Chung cư mini': 'Chung cư mini',
+        'studio': 'Studio', 'Studio': 'Studio',
+        'homestay': 'Homestay', 'Homestay': 'Homestay'
     };
-    const typeLabel = typeMap[property.type] || 'Phòng trọ';
+    const typeLabel = typeMap[property.propertyType] || typeMap[property.type] || 'Phòng trọ';
     
     return `
         <div class="flex-none w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] bg-white/90 backdrop-blur-sm rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 transform hover:-translate-y-2 property-card">
@@ -1115,13 +1117,15 @@ function showPropertyLocation(data) {
     document.body.style.overflow = 'hidden';
 
     // Khởi tạo hoặc cập nhật bản đồ
-    setTimeout(() => {
+    setTimeout(async () => {
         if (mapInstance) {
             mapInstance.remove();
         }
 
-        // Tạo bản đồ mới với Goong Map JS
-        goongjs.accessToken = '3wUhxxPZujfl6OwVJ9N7YdDlGP6pJU62zw5PT4pg';
+        // Tạo bản đồ mới với Goong Map JS - lấy key từ server
+        const mapKeyRes = await fetch('/api/search/maptiles-key');
+        const mapKeyData = await mapKeyRes.json();
+        goongjs.accessToken = mapKeyData.maptilesKey;
         mapInstance = new goongjs.Map({
             container: 'propertyMap',
             style: 'https://tiles.goong.io/assets/goong_map_web.json',

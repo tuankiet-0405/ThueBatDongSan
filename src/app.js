@@ -75,17 +75,7 @@ app.use('/api/moderation', require('./routes/moderationRoutes'));
 app.use('/api/contacts', require('./routes/contactRoutes'));
 app.use('/api/search', require('./routes/searchRoutes')); // 🔐 Goong API proxy
 
-// Config API - Expose public API keys
-app.get('/api/config', (req, res) => {
-  console.log('📡 Config API called - Sending Goong API keys');
-  console.log('GOONG_API_KEY:', process.env.GOONG_API_KEY ? '✓ exists' : '✗ missing');
-  console.log('GOONG_MAPTILES_KEY:', process.env.GOONG_MAPTILES_KEY ? '✓ exists' : '✗ missing');
-  
-  res.json({
-    goongApiKey: process.env.GOONG_API_KEY,
-    goongMaptilesKey: process.env.GOONG_MAPTILES_KEY
-  });
-});
+// Config API - Removed: API keys are now served via /api/search/maptiles-key proxy
 
 // Partials Routes - Phục vụ các file HTML partial
 app.get('/partials/:filename', (req, res) => {
@@ -256,6 +246,22 @@ app.get('/admin/settings', (req, res) => {
 // Chrome DevTools - Ignore this request
 app.get('/.well-known/appspecific/com.chrome.devtools.json', (req, res) => {
   res.status(404).end();
+});
+
+// Route xử lý Đăng xuất chung cho cả Admin và User
+app.get('/logout', (req, res) => {
+  res.send(`
+    <script>
+      fetch('/api/auth/logout').then(() => {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/auth/login';
+      }).catch(() => {
+        localStorage.clear();
+        window.location.href = '/auth/login';
+      });
+    </script>
+  `);
 });
  
 // 404 handler - chỉ cho các route HTML, bỏ qua static files
