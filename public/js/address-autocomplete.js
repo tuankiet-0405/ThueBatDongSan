@@ -5,10 +5,9 @@
  * ===================================
  */
 
-// Config Goong API
-const GOONG_API_KEY = 'DSjPIEgG10IuSHKOn4YXVJwhg3WbNWtxFmoExd9A'; // Thay bằng key thật nếu cần
-const GOONG_AUTOCOMPLETE_URL = 'https://rsapi.goong.io/Place/AutoComplete';
-const GOONG_PLACE_DETAIL_URL = 'https://rsapi.goong.io/Place/Detail';
+// Config Goong API - Backend sẽ proxy requests
+const GOONG_AUTOCOMPLETE_URL = '/api/search/autocomplete';
+const GOONG_PLACE_DETAIL_URL = '/api/search/place-detail';
 
 // State quản lý
 let autocompleteTimeout = null;
@@ -76,18 +75,24 @@ function initGoongAutocomplete() {
 }
 
 /**
- * Gọi Goong Autocomplete API
+ * Gọi Backend Search API (Goong proxy)
  */
 async function fetchAutocompleteSuggestions(query) {
     const suggestionsBox = document.getElementById('addressSuggestions');
     
     try {
-        console.log(`🔍 Goong Autocomplete: "${query}"`);
+        console.log(`🔍 Goong Autocomplete via Backend: "${query}"`);
         
-        const response = await fetch(`${GOONG_AUTOCOMPLETE_URL}?input=${encodeURIComponent(query)}&api_key=${GOONG_API_KEY}`);
+        const response = await fetch(GOONG_AUTOCOMPLETE_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ input: query })
+        });
         
         if (!response.ok) {
-            throw new Error(`Goong API error: ${response.status}`);
+            throw new Error(`Backend search API error: ${response.status}`);
         }
         
         const data = await response.json();
@@ -184,11 +189,17 @@ async function selectPlace(placeId, prediction) {
     showLoading();
     
     try {
-        // Gọi Place Detail API để lấy tọa độ chính xác
-        const response = await fetch(`${GOONG_PLACE_DETAIL_URL}?place_id=${placeId}&api_key=${GOONG_API_KEY}`);
+        // Gọi Backend Place Detail API (Goong proxy)
+        const response = await fetch(GOONG_PLACE_DETAIL_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ place_id: placeId })
+        });
         
         if (!response.ok) {
-            throw new Error(`Goong Place Detail error: ${response.status}`);
+            throw new Error(`Backend place detail API error: ${response.status}`);
         }
         
         const data = await response.json();

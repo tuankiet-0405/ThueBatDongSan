@@ -73,6 +73,7 @@ app.use('/api/chat', require('./routes/chatRoutes'));
 app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/moderation', require('./routes/moderationRoutes'));
 app.use('/api/contacts', require('./routes/contactRoutes'));
+app.use('/api/search', require('./routes/searchRoutes')); // 🔐 Goong API proxy
 
 // Config API - Expose public API keys
 app.get('/api/config', (req, res) => {

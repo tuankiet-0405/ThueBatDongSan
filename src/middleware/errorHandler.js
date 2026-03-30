@@ -20,13 +20,14 @@ const errorHandler = (err, req, res, next) => {
   console.error(err.stack);
 
   // Lấy status code từ error hoặc mặc định 500
-  const statusCode = err.status || err.statusCode || 500;
+  let statusCode = err.status || err.statusCode || 500;
 
   // Lấy message từ error hoặc message mặc định
   let message = err.message || 'Đã xảy ra lỗi server';
 
   // Nếu là lỗi Mongoose validation
   if (err.name === 'ValidationError') {
+    statusCode = 400; // ✅ FIX: Set status to 400 for validation errors
     const errors = Object.values(err.errors).map(val => {
       // Dịch một số message phổ biến sang tiếng Việt
       let msg = val.message;
@@ -57,21 +58,25 @@ const errorHandler = (err, req, res, next) => {
 
   // Nếu là lỗi Mongoose CastError (ID không hợp lệ)
   if (err.name === 'CastError') {
+    statusCode = 400;
     message = 'ID không hợp lệ';
   }
 
   // Nếu là lỗi MongoDB duplicate key
   if (err.code === 11000) {
+    statusCode = 400; // ✅ FIX: Set status to 400 for duplicate key
     const field = Object.keys(err.keyValue)[0];
     message = `${field} đã tồn tại`;
   }
 
   // Nếu là lỗi JWT
   if (err.name === 'JsonWebTokenError') {
+    statusCode = 401;
     message = 'Token không hợp lệ';
   }
 
   if (err.name === 'TokenExpiredError') {
+    statusCode = 401;
     message = 'Token đã hết hạn';
   }
 
